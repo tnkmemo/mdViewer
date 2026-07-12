@@ -283,11 +283,10 @@
         .mdを開く
         <input id="fileInput" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" />
       </label>
-      <button id="sampleButton">サンプル</button>
-      <button id="clearButton">クリア</button>
-      <button id="copyButton">HTMLコピー</button>
+      <button id="downloadMarkdownButton">.md保存</button>
       <button id="downloadButton">HTML保存</button>
       <button id="renderButton" class="primary">再描画</button>
+      <button id="clearButton">クリア</button>
       <span id="status">準備完了</span>
     </div>
   </header>
@@ -516,12 +515,6 @@ end
       preview.prepend(div);
     }
 
-    async function copyPreviewHtml() {
-      const html = preview.innerHTML;
-      await navigator.clipboard.writeText(html);
-      setStatus("プレビューHTMLをコピーしました");
-    }
-
     function downloadPreviewHtml() {
       const bodyHtml = preview.innerHTML;
 
@@ -584,15 +577,21 @@ ${bodyHtml}
       setStatus("HTMLを保存しました");
     }
 
+    function downloadMarkdown() {
+      const blob = new Blob([editor.value], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "markdown_export.md";
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus(".mdを保存しました");
+    }
+
     function clearEditor() {
       if (!confirm("Markdown入力をクリアしますか？")) return;
       editor.value = "";
       localStorage.removeItem("markdown-viewer-content");
-      render();
-    }
-
-    function loadSample() {
-      editor.value = SAMPLE_MARKDOWN;
       render();
     }
 
@@ -607,9 +606,8 @@ ${bodyHtml}
     }
 
     document.getElementById("renderButton").addEventListener("click", render);
-    document.getElementById("sampleButton").addEventListener("click", loadSample);
     document.getElementById("clearButton").addEventListener("click", clearEditor);
-    document.getElementById("copyButton").addEventListener("click", copyPreviewHtml);
+    document.getElementById("downloadMarkdownButton").addEventListener("click", downloadMarkdown);
     document.getElementById("downloadButton").addEventListener("click", downloadPreviewHtml);
 
     document.getElementById("fileInput").addEventListener("change", (event) => {
