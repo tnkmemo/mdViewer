@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Markdown Viewer - Mermaid / Markmap対応</title>
+
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --panel: #ffffff;
+      --border: #d8d8df;
+      --text: #202124;
+      --muted: #666a73;
+      --accent: #2563eb;
+      --code-bg: #f1f3f5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    button,
+    label.file-button {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button:hover,
+    label.file-button:hover {
+      filter: brightness(0.97);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+      gap: 12px;
+      height: calc(100vh - 54px);
+      padding: 12px;
+    }
+
+    .pane {
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pane-title {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      background: #fbfbfc;
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      resize: none;
+      border: 0;
+      outline: 0;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+
+    #preview {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 20px 28px 48px;
+      line-height: 1.75;
+    }
+
+    #status {
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 150px;
+      text-align: right;
+    }
+
+    #dropHint {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(37, 99, 235, 0.12);
+      border: 4px dashed rgba(37, 99, 235, 0.55);
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      pointer-events: none;
+    }
+
+    body.dragging #dropHint {
+      display: flex;
+    }
+
+    #preview h1,
+    #preview h2,
+    #preview h3 {
+      line-height: 1.35;
+      margin-top: 1.4em;
+      margin-bottom: 0.5em;
+    }
+
+    #preview h1 {
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.25em;
+    }
+
+    #preview h2 {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.2em;
+    }
+
+    #preview code {
+      background: var(--code-bg);
+      padding: 0.15em 0.35em;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+    }
+
+    #preview pre {
+      background: var(--code-bg);
+      padding: 12px 14px;
+      border-radius: 8px;
+      overflow: auto;
+    }
+
+    #preview pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    #preview blockquote {
+      border-left: 4px solid var(--border);
+      padding-left: 12px;
+      color: var(--muted);
+      margin-left: 0;
+    }
+
+    #preview table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+    }
+
+    #preview th,
+    #preview td {
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+    }
+
+    #preview th {
+      background: #f3f4f6;
+    }
+
+    #preview img {
+      max-width: 100%;
+    }
+
+    .mermaid {
+      background: transparent !important;
+      text-align: center;
+    }
+
+    .markmap-wrap {
+      height: 420px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin: 1em 0;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .markmap-wrap svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .error-box {
+      border: 1px solid #f3b4b4;
+      background: #fff5f5;
+      color: #991b1b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .pane {
+        min-height: 45vh;
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      #status {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Markdown Viewer</h1>
+
+    <div class="toolbar">
+      <label class="file-button">
+        .mdを開く
+        <input id="fileInput" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" />
+      </label>
+      <button id="sampleButton">サンプル</button>
+      <button id="clearButton">クリア</button>
+      <button id="copyButton">HTMLコピー</button>
+      <button id="downloadButton">HTML保存</button>
+      <button id="renderButton" class="primary">再描画</button>
+      <span id="status">準備完了</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="pane">
+      <div class="pane-title">Markdown</div>
+      <textarea id="editor" spellcheck="false"></textarea>
+    </section>
+
+    <section class="pane">
+      <div class="pane-title">Preview</div>
+      <article id="preview"></article>
+    </section>
+  </main>
+
+  <div id="dropHint">Markdownファイルをドロップ</div>
+
+  <!-- Markdown parser -->
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+
+  <!-- Markmap dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12/dist/browser/index.iife.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.12/dist/browser/index.js"></script>
+
+  <!-- Mermaid is loaded as ES module -->
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs";
+
+    const SAMPLE_MARKDOWN = `# Markdown Viewer サンプル
+
+このHTMLは、ローカルで開くだけで使える自分用Markdownビューアです。
+
+## 基本Markdown
+
+- 箇条書き
+- **太字**
+- \`inline code\`
+
+| 項目 | 内容 |
+|---|---|
+| Markdown | markdown-itでHTML化 |
+| Mermaid | \`\`\`mermaid ブロックに対応 |
+| Markmap | \`\`\`markmap ブロックに対応 |
+
+## Mermaid例
+
+\`\`\`mermaid
+flowchart LR
+  A[Markdownを書く] --> B[HTMLに変換]
+  B --> C{図表ブロック?}
+  C -->|mermaid| D[Mermaidで描画]
+  C -->|markmap| E[Markmapで描画]
+  C -->|通常| F[HTMLとして表示]
+\`\`\`
+
+## Markmap例
+
+\`\`\`markmap
+# 半導体設計フロー
+## 仕様検討
+## RTL設計
+### Verilog
+### SystemVerilog
+## 検証
+### テストベンチ
+### チェッカ
+### カバレッジ
+## 論理合成
+## P&R
+## テープアウト
+\`\`\`
+
+## コード例
+
+\`\`\`systemverilog
+always_ff @(posedge clk or negedge rst_n) begin
+  if (!rst_n) begin
+    q <= '0;
+  end else begin
+    q <= d;
+  end
+end
+\`\`\`
+`;
+
+    const editor = document.getElementById("editor");
+    const preview = document.getElementById("preview");
+    const status = document.getElementById("status");
+
+    const md = window.markdownit({
+      html: false,
+      breaks: true,
+      linkify: true,
+      typographer: true
+    });
+
+    md.enable(["table", "strikethrough"]);
+
+    const defaultFence = md.renderer.rules.fence;
+
+    md.renderer.rules.fence = function(tokens, idx, options, env, self) {
+      const token = tokens[idx];
+      const lang = token.info.trim().split(/\s+/)[0].toLowerCase();
+      const code = token.content;
+
+      if (lang === "mermaid") {
+        if (!env.mermaidBlocks) env.mermaidBlocks = [];
+        env.mermaidBlocks.push(code);
+        return `<pre class="mermaid">${escapeHtml(code)}</pre>`;
+      }
+
+      if (lang === "markmap") {
+        if (!env.markmapBlocks) env.markmapBlocks = [];
+        const id = `markmap-${env.markmapBlocks.length}`;
+        env.markmapBlocks.push({ id, code });
+
+        return `
+          <div class="markmap-wrap">
+            <svg id="${id}" data-markmap-source="${escapeAttribute(code)}"></svg>
+          </div>
+        `;
+      }
+
+      return defaultFence(tokens, idx, options, env, self);
+    };
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "default"
+    });
+
+    function escapeHtml(str) {
+      return str
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function escapeAttribute(str) {
+      return escapeHtml(str)
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function setStatus(message) {
+      status.textContent = message;
+    }
+
+    function loadSavedOrSample() {
+      const saved = localStorage.getItem("markdown-viewer-content");
+      editor.value = saved || SAMPLE_MARKDOWN;
+    }
+
+    let renderTimer = null;
+
+    function scheduleRender() {
+      clearTimeout(renderTimer);
+      renderTimer = setTimeout(render, 250);
+    }
+
+    async function render() {
+      const env = {
+        markmapBlocks: [],
+        mermaidBlocks: []
+      };
+
+      localStorage.setItem("markdown-viewer-content", editor.value);
+
+      try {
+        preview.innerHTML = md.render(editor.value, env);
+      } catch (error) {
+        preview.innerHTML = `<div class="error-box">Markdown変換エラー:\n${escapeHtml(error.message)}</div>`;
+        setStatus("Markdown変換エラー");
+        return;
+      }
+
+      try {
+        await mermaid.run({
+          nodes: preview.querySelectorAll(".mermaid"),
+          suppressErrors: false
+        });
+      } catch (error) {
+        appendError(`Mermaid描画エラー:\n${error.message}`);
+      }
+
+      try {
+        renderMarkmaps(env.markmapBlocks);
+      } catch (error) {
+        appendError(`Markmap描画エラー:\n${error.message}`);
+      }
+
+      setStatus(`描画完了 ${new Date().toLocaleTimeString()}`);
+    }
+
+    function renderMarkmaps(blocks) {
+      if (!blocks || blocks.length === 0) return;
+
+      const { Transformer } = window.markmap;
+      const { Markmap } = window.markmap;
+
+      const transformer = new Transformer();
+
+      for (const block of blocks) {
+        const svg = document.getElementById(block.id);
+        if (!svg) continue;
+
+        const { root } = transformer.transform(block.code);
+        const mm = Markmap.create(svg, {
+          autoFit: true,
+          duration: 300,
+          paddingX: 16
+        }, root);
+
+        // 初回表示時に少し待ってからフィットさせる
+        setTimeout(() => mm.fit(), 50);
+      }
+    }
+
+    function appendError(message) {
+      const div = document.createElement("div");
+      div.className = "error-box";
+      div.textContent = message;
+      preview.prepend(div);
+    }
+
+    async function copyPreviewHtml() {
+      const html = preview.innerHTML;
+      await navigator.clipboard.writeText(html);
+      setStatus("プレビューHTMLをコピーしました");
+    }
+
+    function downloadPreviewHtml() {
+      const bodyHtml = preview.innerHTML;
+
+      const fullHtml = `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Markdown Export</title>
+<style>
+body { max-width: 960px; margin: 32px auto; padding: 0 20px; font-family: system-ui, sans-serif; line-height: 1.75; }
+pre { background: #f1f3f5; padding: 12px 14px; border-radius: 8px; overflow: auto; }
+code { background: #f1f3f5; padding: 0.15em 0.35em; border-radius: 4px; }
+pre code { background: transparent; padding: 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #d8d8df; padding: 6px 8px; }
+img { max-width: 100%; }
+svg { max-width: 100%; }
+.markmap-wrap { height: 420px; border: 1px solid #d8d8df; border-radius: 10px; margin: 1em 0; background: #fff; overflow: hidden; }
+.markmap-wrap svg { width: 100%; height: 100%; max-width: 100%; }
+</style>
+</head>
+<body>
+${bodyHtml}
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12/dist/browser/index.iife.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.12/dist/browser/index.js"><\/script>
+<script>
+  (() => {
+    if (!window.markmap) return;
+
+    const { Transformer } = window.markmap;
+    const { Markmap } = window.markmap;
+    const transformer = new Transformer();
+
+    document.querySelectorAll("svg[data-markmap-source]").forEach((svg) => {
+      const source = svg.dataset.markmapSource || "";
+      const { root } = transformer.transform(source);
+      svg.replaceChildren();
+
+      const mm = Markmap.create(svg, {
+        autoFit: true,
+        duration: 300,
+        paddingX: 16
+      }, root);
+
+      setTimeout(() => mm.fit(), 50);
+    });
+  })();
+<\/script>
+</body>
+</html>`;
+
+      const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "markdown_export.html";
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus("HTMLを保存しました");
+    }
+
+    function clearEditor() {
+      if (!confirm("Markdown入力をクリアしますか？")) return;
+      editor.value = "";
+      localStorage.removeItem("markdown-viewer-content");
+      render();
+    }
+
+    function loadSample() {
+      editor.value = SAMPLE_MARKDOWN;
+      render();
+    }
+
+    function readFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        editor.value = String(reader.result || "");
+        render();
+      };
+      reader.onerror = () => setStatus("ファイル読込エラー");
+      reader.readAsText(file, "utf-8");
+    }
+
+    document.getElementById("renderButton").addEventListener("click", render);
+    document.getElementById("sampleButton").addEventListener("click", loadSample);
+    document.getElementById("clearButton").addEventListener("click", clearEditor);
+    document.getElementById("copyButton").addEventListener("click", copyPreviewHtml);
+    document.getElementById("downloadButton").addEventListener("click", downloadPreviewHtml);
+
+    document.getElementById("fileInput").addEventListener("change", (event) => {
+      const file = event.target.files?.[0];
+      if (file) readFile(file);
+      event.target.value = "";
+    });
+
+    editor.addEventListener("input", scheduleRender);
+
+    window.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      document.body.classList.add("dragging");
+    });
+
+    window.addEventListener("dragleave", () => {
+      document.body.classList.remove("dragging");
+    });
+
+    window.addEventListener("drop", (event) => {
+      event.preventDefault();
+      document.body.classList.remove("dragging");
+
+      const file = event.dataTransfer.files?.[0];
+      if (file) readFile(file);
+    });
+
+    loadSavedOrSample();
+    render();
+  </script>
+</body>
+</html>
